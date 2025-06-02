@@ -684,6 +684,26 @@ Mat cleanBinaryImage(Mat src, int erodeCount = 1, int dilateCount = 2) {
 	return cleaned;
 }
 
+cv::Rect myBoundingRect(const std::vector<cv::Point>& contour) {
+	if (contour.empty()) return cv::Rect();  
+
+	int minX = contour[0].x;
+	int minY = contour[0].y;
+	int maxX = contour[0].x;
+	int maxY = contour[0].y;
+
+	for (const auto& point : contour) {
+		if (point.x < minX) minX = point.x;
+		if (point.y < minY) minY = point.y;
+		if (point.x > maxX) maxX = point.x;
+		if (point.y > maxY) maxY = point.y;
+	}
+
+	int width = maxX - minX + 1;
+	int height = maxY - minY + 1;
+
+	return cv::Rect(minX, minY, width, height);
+}
 
 
 void licensePlateDetection()
@@ -730,7 +750,7 @@ void licensePlateDetection()
 		cv::Rect bestPlate;
 
 		for (const auto& contour : contours) {
-			cv::Rect rect = boundingRect(contour);
+			cv::Rect rect = myBoundingRect(contour);
 			double aspectRatio = (double)rect.width / rect.height;
 			double area = rect.area();
 

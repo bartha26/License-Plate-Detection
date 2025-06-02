@@ -547,7 +547,6 @@ Mat blackHat(Mat src)
 
 int computeOtsuThreshold(const Mat& gray)
 {
-	// Step 1: Compute histogram
 	int hist[256] = { 0 };
 	int totalPixels = gray.rows * gray.cols;
 
@@ -558,7 +557,6 @@ int computeOtsuThreshold(const Mat& gray)
 		}
 	}
 
-	// Step 2: Compute global mean (μT)
 	double sum = 0;
 	for (int t = 0; t < 256; t++) {
 		sum += t * hist[t];
@@ -571,21 +569,19 @@ int computeOtsuThreshold(const Mat& gray)
 	int bestThreshold = 0;
 
 	for (int t = 0; t < 256; t++) {
-		wB += hist[t];               // Weight of background
+		wB += hist[t];               
 		if (wB == 0) continue;
 
-		wF = totalPixels - wB;       // Weight of foreground
+		wF = totalPixels - wB;       
 		if (wF == 0) break;
 
 		sumB += t * hist[t];
 
-		double mB = sumB / wB;       // Mean of background
-		double mF = (sum - sumB) / wF; // Mean of foreground
+		double mB = sumB / wB;       
+		double mF = (sum - sumB) / wF; 
 
-		// Between-class variance
 		double varBetween = static_cast<double>(wB) * wF * (mB - mF) * (mB - mF);
 
-		// Maximize the between-class variance
 		if (varBetween > maxVariance) {
 			maxVariance = varBetween;
 			bestThreshold = t;
@@ -666,20 +662,13 @@ Mat myGaussianBlur(Mat src)
 Mat cleanBinaryImage(Mat src, int erodeCount = 1, int dilateCount = 2) {
 	Mat cleaned = src.clone();
 
-	// Apply erosion
 	for (int i = 0; i < erodeCount; i++) {
 		cleaned = erosionHelper(cleaned);
 	}
 
-	// Apply dilation
 	for (int i = 0; i < dilateCount; i++) {
 		cleaned = dilationHelper(cleaned);
 	}
-
-	//// Apply closing (dilation + erosion)
-	//for (int i = 0; i < closingCount; i++) {
-	//	cleaned = closingHelper(cleaned);
-	//}
 
 	return cleaned;
 }
@@ -711,12 +700,13 @@ void licensePlateDetection()
 	char fname[MAX_PATH];
 	while (openFileDlg(fname))
 	{
+		int minRatio = 2;
+		int maxRatio = 6;
+
 		Mat src = imread(fname, IMREAD_COLOR);
 
 		Mat preprocessedImage = preprocessImage(src);
 		Mat blackHatMatrix = blackHat(preprocessedImage);
-		//Mat preBin = applyBinaryThreshold(preprocessedImage, 128); 
-		//Mat closedImage = closingHelper(preprocessedImage);
 
 		Mat closedImage = closingHelper(preprocessedImage);
 		int otsuTreshold = computeOtsuThreshold(closedImage);
@@ -728,7 +718,7 @@ void licensePlateDetection()
 		Mat gaussinBlur = myGaussianBlur(scharrResult);
 
 		Mat closed2;
-		Mat rectKernel = getStructuringElement(MORPH_RECT, Size(17, 3)); // Wider than tall
+		Mat rectKernel = getStructuringElement(MORPH_RECT, Size(17, 3));
 		morphologyEx(gaussinBlur, closed2, MORPH_CLOSE, rectKernel);
 
 		int otsuTreshold2 = computeOtsuThreshold(closed2);
@@ -741,7 +731,6 @@ void licensePlateDetection()
 		bitwise_and(clearBinaryImage, binaryImage, finalImage);
 
 		std::string savePath = "output/final_" + std::string(fname).substr(std::string(fname).find_last_of("/\\") + 1);
-		//imwrite(savePath, finalImage);
 
 		std::vector<std::vector<cv::Point>> contours;
 		findContours(finalImage, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
@@ -754,7 +743,7 @@ void licensePlateDetection()
 			double aspectRatio = (double)rect.width / rect.height;
 			double area = rect.area();
 
-			if (aspectRatio > 2 && aspectRatio < 6 && rect.width > 50 && rect.height > 15 && rect.y > src.rows * 0.2) {
+			if (aspectRatio > minRatio && aspectRatio < maxRatio && rect.width > 50 && rect.height > 15 && rect.y > src.rows * 0.2) {
 				if (area > maxArea) {
 					maxArea = area;
 					bestPlate = rect;
@@ -764,16 +753,15 @@ void licensePlateDetection()
 
 		if (maxArea > 0) {
 
-			cv::Mat roi = src(bestPlate); // crop from original image
-			// Convert to grayscale and threshold
+			cv::Mat roi = src(bestPlate); 
+
 			cv::Mat gray, binary;
 			gray = convertToGrayscale(roi);
-			//cvtColor(roi, gray, COLOR_BGR2GRAY);
 			
 			int otsuTreshold3 = computeOtsuThreshold(gray);
 			binary = applyBinaryThreshold(gray, otsuTreshold3);
 
-			cv::rectangle(src, bestPlate, cv::Scalar(0, 255, 0), 2); // Green border
+			cv::rectangle(src, bestPlate, cv::Scalar(0, 255, 0), 2); 
 
 			imshow("output/plate_binary.png", binary); 
 			imwrite("detected_plate.png", binary);
